@@ -609,7 +609,7 @@ def mainOld():
 def main():
     """Example usage and testing with enhanced GitDiffReader."""
     try:
-        reader = GitDiffReader('.')
+        reader = GitDiffReader('/home/mohsen/work/yorku/bulkGeneFormer/')
         
         print(f"Current branch: {reader.get_current_branch()}")
         print(f"All branches: {reader.get_all_branches()}")
@@ -789,5 +789,65 @@ Requirements:
     except Exception as e:
         print(f"Initialization error: {e}")
 
+
+def rag_msg():
+    try:
+        reader = GitDiffReader('/home/mohsen/work/yorku/bulkGeneFormer/')
+
+        # Get current branch
+        current_branch = reader.get_current_branch()
+        print(f"Current branch: {current_branch}")
+
+        # Compare with main to get all changes across commits
+        if current_branch != "main":
+            diff_text = reader.get_diff(DiffMode.COMMITTED, "main", current_branch)
+        else:
+            # If you are on main, compare with first parent commit
+            diff_text = reader.get_diff(DiffMode.COMMITTED, "main~1", "main")
+
+        if diff_text:
+            file_changes = reader.parse_diff(diff_text)
+
+            # 🔹 Filter to only Python files
+            file_changes = [fc for fc in file_changes if fc.file_path.endswith(".py")]
+
+            if not file_changes:
+                print("No Python file changes found.")
+                return
+
+            # Summarize total additions/deletions
+            total_added = sum(fc.lines_added for fc in file_changes)
+            total_deleted = sum(fc.lines_deleted for fc in file_changes)
+            print(f"Collected {len(file_changes)} Python files, +{total_added}/-{total_deleted}")
+
+            # Generate RAG-ready context
+            rag_context = reader.format_for_rag(file_changes)
+
+            # For passing into LLM / RAG pipeline
+            llm_prompt = f"""
+Based on the following Python code changes in branch {current_branch}, 
+generate a Pull Request description:
+
+{rag_context}
+
+Requirements:
+- Title: concise summary of the main change
+- Body: describe key modifications, motivations, and impact
+- Use bullet points for multiple changes
+- Keep it professional and clear
+"""
+            print("\n=== LLM Prompt for PR ===")
+            print(llm_prompt)
+
+        else:
+            print("No changes found between current branch and main")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+
 if __name__ == "__main__":
-    main() 
+    # main()
+    # 
+    rag_msg() 
